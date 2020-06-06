@@ -1,0 +1,121 @@
+---
+- hosts: localhost
+  become: yes
+  vars:
+    hashicorp_vault_release: https://releases.hashicorp.com/vault/1.4.2/vault_1.4.2_linux_amd64.zip
+    vault_deploy_path: /opt/hashicorp
+    vault_user: root
+    vault_group: root
+    vault_config_file: config.hcl
+    vault_log_level: info
+    systemd_unit_dir: /usr/lib/systemd/system
+    install_service: false
+    vault_url: http://localhost:8200
+    vault_keys: 5             # use at least 5 for production
+    vault_keys_threshold: 3   # never more than `vault_keys`
+
+  tasks:
+    - set_fact:
+        vault_bin_dir: "{{ vault_deploy_path }}/bin"
+        vault_config_dir: "{{ vault_deploy_path }}/etc/vault.d"
+        vault_data_dir: "{{ vault_deploy_path }}/vault/data"
+
+
+    - name: Prepare vault installation
+      block:
+        - name: download vault package
+          get_url:
+            url: "{{ hashicorp_vault_release }}"
+            dest: /tmp
+            mode: 0644
+
+        - name: create vault install paths
+          file:
+            path: "{{  item }}"
+            state: directory
+            mode: 0755
+          loop:
+            - "{{ vault_deploy_path }}"
+            - "{{ vault_bin_dir }}"
+            - "{{ vault_config_dir }}"
+
+        - name: create vault data store
+          file:
+            path: "{{ vault_data_dir }}"
+            state: directory
+            mode: 0700
+
+
+    - name: Vault installation
+      block:
+        - name: install vault binary
+          unarchive:
+            src: "/tmp/{{ hashicorp_vault_release | basename }}"
+            dest: "{{ vault_bin_dir }}"
+            mode: 0755 
+
+        - name: install vault configuration
+          template:
+            src: config-file.hcl.j2
+            dest: "{{ vault_config_dir }}/{{ vault_config_file }}"
+            mode: 0600
+
+    - name: Vault service
+      block:
+        - name: install vault service
+          template:
+            src: vault.service.j2
+            dest: "{{ systemd_unit_dir }}/vault.service"
+            mode: 0600
+ 
+        - name: start vault service
+          service:
+            name: vault
+            enabled: yes
+            state: restarted
+      when: install_service
+
+
+    - name: Vault non-service
+      block:
+        - name: create start vault script when not using systemd
+          template:
+            dest: "{{ vault_bin_dir }}/start-vault.sh"
+            src: start-vault.sh.j2
+            mode: 0755
+
+        - name: start vault (non-service)
+          shell: |
+            ( setsid {{ vault_bin_dir }}/start-vault.sh </dev/null >/dev/null 2>&1 & )
+      when: not install_service
+
+
+    - name: Vault initialization
+      block:
+        - name: initialize vault
+          uri:
+            url: "{{ vault_url }}/v1/sys/init"
+            method: POST
+            body_format: json
+            body:
+              secret_shares: "{{ vault_keys }}"
+              secret_threshold: "{{ vault_keys_threshold }}"
+          register: vault_init_response
+
+        - name: unseal vault
+          uri:
+            url: "{{ vault_url }}/v1/sys/unseal"
+            method: POST
+            body_format: json
+            body:
+              key: "{{ item }}"
+          loop: "{{ vault_init_response.json.keys_base64 }}"
+          loop_control:
+            extended: yes
+            label: "Shamir key {{ ansible_loop.index }}"
+
+        - name: save keys and root token
+          template:
+            src: keys.yaml.j2
+            dest: "{{ vault_deploy_path }}/keys.yaml"
+            mode: 0400

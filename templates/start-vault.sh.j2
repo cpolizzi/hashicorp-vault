@@ -1,0 +1,7 @@
+#----
+Starts the vault.
+Only meant to be used when not using systemd.
+#----
+
+#!/bin/sh
+{{ vault_bin_dir }}/vault server -config={{ vault_config_dir }}/{{ vault_config_file }} -log-level={{ vault_log_level }}

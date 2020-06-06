@@ -1,0 +1,20 @@
+[Unit]
+Description=Vault secret management tool
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+User={{ vault_user }}
+Group={{ vault_group }}
+PIDFile=/var/run/vault/vault.pid
+PermissionsStartOnly=true
+ExecStart={{ vault_bin_dir }}/vault server -config={{ vault_config_dir }}/{{ vault_config_file }} -log-level={{ vault_log_level }}
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+KillSignal=SIGTERM
+Restart=on-failure
+RestartSec=42s
+LimitMEMLOCK=infinity
+
+[Install]
+WantedBy=multi-user.target
