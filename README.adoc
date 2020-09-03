@@ -1,0 +1,18 @@
+= HashiCorp Vault
+
+Downloads vault binary and installsa single vault instance using a file system backend only. Sets up vault lifecycle
+management via systemd. Unseals the vault after creation and stores the Shamir keys as part of the vault installation
+location itself.
+
+**This is only meant for non-shared development and testing only**
+
+== Usage
+
+[source,bash]
+----
+ansible-playbook deploy-vault.yaml
+----
+
+Vault is bound only to `localhost`.
+
+Shamir keys and root token can be found in `/opt/hashicorp/keys.yaml`.

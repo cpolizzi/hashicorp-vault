@@ -2,14 +2,14 @@
 - hosts: localhost
   become: yes
   vars:
-    hashicorp_vault_release: https://releases.hashicorp.com/vault/1.4.2/vault_1.4.2_linux_amd64.zip
+    hashicorp_vault_release: https://releases.hashicorp.com/vault/1.5.3/vault_1.5.3_linux_amd64.zip
     vault_deploy_path: /opt/hashicorp
     vault_user: root
     vault_group: root
     vault_config_file: config.hcl
     vault_log_level: info
     systemd_unit_dir: /usr/lib/systemd/system
-    install_service: false
+    install_service: true
     vault_url: http://localhost:8200
     vault_keys: 5             # use at least 5 for production
     vault_keys_threshold: 3   # never more than `vault_keys`
